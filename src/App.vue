@@ -1,6 +1,5 @@
 <script setup>
-import fitCurve from "fit-curve";
-import { onMounted, onUpdated, ref, useTemplateRef, watch } from "vue";
+import { onMounted, useTemplateRef } from "vue";
 const pi = Math.PI;
 const pi2 = pi * 2;
 
@@ -112,101 +111,52 @@ const canvasRef = useTemplateRef("canvas-ref");
 
 const spine = new Spine(100, 20, 13);
 
-const render = () => {
+const generate = () => {
+
+	const points = [];
 
 	const target = vec(0, 0, 0);
 	const camera = vec(-90, -90, 130);
 	const f = 100;
 
-	ctx.clearRect(0, 0, cnv.width, cnv.height);
-
 	const dt = 0.1 / spine.n;
-
-	const points = [];
 
 	for (let t = 0; t < pi2; t += dt) {
 
 		points.push( proj( spine.fx(t), spine.fy(t), spine.fz(t), target, camera, f ) );
 	}
 
-	const plen = points.length;
+	return points;
+};
 
-	ctx.strokeStyle = "#ffffff";
-	ctx.lineCap = "round";
+const render = (points, i0) => {
 
-	for (let i = 0; i < plen; i++) {
+	ctx.clearRect(0, 0, cnv.width, cnv.height);
 
-		const perc = -2 * Math.abs( (i / plen) - 0.5 ) + 1;
-		ctx.lineWidth = 4 + (perc * 12);
-		//ctx.lineWidth = 1;
+	ctx.fillStyle = "#ffffff";
+
+	const gap = 0.1;
+
+	let i = Math.floor( points.length * (gap + i0) );
+	const ie = points.length + Math.floor( points.length * i0 );
+
+	for (i; i < ie; i++) {
+
+		const mi = i % points.length;
+
+		const coef = -2 * Math.abs( (mi / points.length) - 0.5 ) + 1;
+		const r = coef * 4 + 4;
 
 		ctx.beginPath();
 
-		if (i === 0) {
-			ctx.moveTo(points[plen - 1][0], points[plen - 1][1]);
-		} else {
-			ctx.moveTo(points[i - 1][0], points[i - 1][1]);
-		}
-		ctx.lineTo(points[i][0], points[i][1]);
-		ctx.stroke();
+		ctx.arc(points[mi][0], points[mi][1], r, 0, pi2);
+		ctx.fill();
 	}
-
-	const curves = fitCurve(points, 2);
-
-	ctx.lineWidth = 1;
-	ctx.strokeStyle = "red";
-	ctx.beginPath();
-	ctx.moveTo(curves[0][0], curves[0][1]);
-
-	for (let i = 0; i < curves.length; i++) {
-
-		ctx.bezierCurveTo(...curves[i][1], ...curves[i][2], ...curves[i][3]);
-	}
-
-	ctx.stroke();
-
-	ctx.beginPath();
-
-	ctx.fillStyle = "red";
-
-	for (let i = 0; i < curves.length; i++) {
-
-		ctx.moveTo(...curves[i][0]);
-		ctx.arc(...curves[i][0], 2, 0, pi2);
-	}
-
-	ctx.fill();
-
-
-	const Ox = window.innerWidth / 2, Oy = window.innerHeight / 2;
-
-	console.log(
-		`<?xml version="1.0" standalone="no"?>\n<svg width="5cm" height="4cm" version="1.1" xmlns="http://www.w3.org/2000/svg">\n\t<path d="M ${
-			(curves[0][0][0] - Ox).toFixed(4)
-		} ${
-			(curves[0][0][1] - Oy).toFixed(4)
-		}${
-			curves.map(([, b, c, d ]) => {
-
-				return ` C ${
-						(b[0] - Ox).toFixed(4)
-					} ${
-						(b[1] - Oy).toFixed(4)
-					}, ${
-						(c[0] - Ox).toFixed(4)
-					} ${
-						(c[1] - Oy).toFixed(4)
-					}, ${
-						(d[0] - Ox).toFixed(4)
-					} ${
-						(d[1] - Oy).toFixed(4)
-					}`;
-			})
-		}"/>\n</svg>`
-	);
 };
 
 onMounted(() => {
+
+	const points = generate();
 
 	cnv = canvasRef.value;
 
@@ -215,13 +165,32 @@ onMounted(() => {
 
 	ctx = canvasRef.value.getContext("2d");
 
-	render();
+	const fps = 60;
+	const dms = 1000 / fps;
+	let _ms = new Date();
+
+	let t = 0;
+	const dt = 0.05 / fps;
+
+	const animation = () => {
+
+		const ms = new Date();
+
+		if ( ms - _ms > dms ) {
+
+			render(points, t);
+
+			t += dt;
+			t %= 1;
+
+			_ms = ms;
+		}
+
+		requestAnimationFrame(animation);
+	};
+
+	requestAnimationFrame(animation);
 });
-
-//onUpdated(() => {
-
-//	render();
-//});
 
 </script>
 
